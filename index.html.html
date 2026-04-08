@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptForge — AI Prompt Generator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #222222;
+    --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.16);
+    --text: #f0f0f0; --muted: #888; --accent: #7c6ef5; --accent2: #9d8ff7;
+    --accent-bg: rgba(124,110,245,0.12); --accent-border: rgba(124,110,245,0.35);
+    --output-bg: #0e0e1a; --success: #1d9e75; --radius: 10px; --radius-sm: 6px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.6; min-height: 100vh; }
+  header { border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: rgba(15,15,15,0.96); backdrop-filter: blur(8px); z-index: 100; gap: 16px; }
+  .logo { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+  .api-key-wrap { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+  .api-key-wrap label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .api-key-wrap input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 6px 10px; width: 200px; outline: none; font-family: monospace; transition: border-color 0.15s; }
+  .api-key-wrap input:focus { border-color: var(--accent-border); }
+  .key-status { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.2s; }
+  .key-status.ok { background: var(--success); }
+  .key-hint { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .key-hint a { color: var(--accent2); text-decoration: none; }
+  .key-hint a:hover { text-decoration: underline; }
+  main { max-width: 820px; margin: 0 auto; padding: 28px 24px 80px; }
+  .tab-group { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; margin-bottom: 24px; }
+  .tab-btn { flex: 1; padding: 9px; border: none; border-radius: 7px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .tab-btn:hover { color: var(--text); background: var(--surface2); }
+  .tab-btn.active { background: var(--accent-bg); color: var(--accent2); border: 1px solid var(--accent-border); }
+  .video-mode-toggle { display: flex; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; margin-bottom: 20px; width: fit-content; }
+  .mode-btn { padding: 6px 16px; border: none; border-radius: 5px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .mode-btn:hover { color: var(--text); }
+  .mode-btn.active { background: var(--accent-bg); color: var(--accent2); border: 1px solid var(--accent-border); }
+  .mode-badge { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: rgba(124,110,245,0.2); color: var(--accent2); }
+  .tool-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px; }
+  .tool-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; cursor: pointer; background: var(--surface); transition: all 0.15s; text-align: center; }
+  .tool-card:hover { border-color: var(--border-hover); background: var(--surface2); }
+  .tool-card.selected { border-color: var(--accent-border); background: var(--accent-bg); }
+  .tool-card .tool-name { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 3px; }
+  .tool-card.selected .tool-name { color: var(--accent2); }
+  .tool-card .tool-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .tool-logo { font-size: 20px; margin-bottom: 6px; display: block; }
+  .field-label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; display: block; }
+  textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; padding: 14px; resize: vertical; min-height: 120px; outline: none; font-family: inherit; line-height: 1.6; transition: border-color 0.15s; }
+  textarea:focus { border-color: var(--accent-border); }
+  textarea::placeholder { color: var(--muted); }
+  .section { margin-bottom: 20px; }
+  .collapsible-header { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 0; color: var(--muted); font-size: 13px; user-select: none; border-top: 1px solid var(--border); margin-top: 4px; transition: color 0.15s; }
+  .collapsible-header:hover { color: var(--text); }
+  .collapsible-header .chevron { transition: transform 0.2s; margin-left: auto; font-size: 10px; }
+  .collapsible-header.open .chevron { transform: rotate(180deg); }
+  .collapsible-body { display: none; padding: 16px 0 8px; }
+  .collapsible-body.open { display: block; }
+  .pill-field { margin-bottom: 22px; }
+  .pill-field:last-child { margin-bottom: 0; }
+  .pills-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pill { padding: 5px 13px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.12s; white-space: nowrap; user-select: none; }
+  .pill:hover { border-color: var(--border-hover); color: var(--text); }
+  .pill.selected { border-color: var(--accent-border); background: var(--accent-bg); color: var(--accent2); }
+  .ar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 7px; }
+  .ar-card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 10px; background: var(--surface); cursor: pointer; transition: all 0.12s; display: flex; align-items: center; gap: 9px; }
+  .ar-card:hover { border-color: var(--border-hover); }
+  .ar-card.selected { border-color: var(--accent-border); background: var(--accent-bg); }
+  .ar-visual { flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border-hover); border-radius: 3px; }
+  .ar-card.selected .ar-visual { border-color: rgba(124,110,245,0.5); }
+  .ar-text { display: flex; flex-direction: column; gap: 1px; }
+  .ar-ratio { font-size: 12px; font-weight: 600; color: var(--text); }
+  .ar-card.selected .ar-ratio { color: var(--accent2); }
+  .ar-name { font-size: 10px; color: var(--muted); line-height: 1.3; }
+  .btn-generate { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: var(--radius); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; letter-spacing: -0.2px; }
+  .btn-generate:hover { background: var(--accent2); }
+  .btn-generate:active { transform: scale(0.99); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .output-section { margin-top: 28px; display: none; }
+  .output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .output-label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .tool-badge { background: var(--accent-bg); color: var(--accent2); border: 1px solid var(--accent-border); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 500; }
+  .output-box { background: var(--output-bg); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 20px; font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 12.5px; line-height: 1.85; color: #c8c5ff; white-space: pre-wrap; word-break: break-word; min-height: 80px; }
+  .btn-copy { margin-top: 12px; padding: 8px 16px; background: transparent; border: 1px solid var(--border-hover); border-radius: var(--radius-sm); color: var(--muted); font-size: 13px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .btn-copy:hover { border-color: var(--accent-border); color: var(--accent2); }
+  .btn-copy.copied { color: var(--success); border-color: var(--success); }
+  .error-box { background: rgba(226,75,74,0.1); border: 1px solid rgba(226,75,74,0.3); border-radius: var(--radius); padding: 14px 16px; font-size: 13px; color: #f09595; margin-top: 16px; display: none; }
+  .char-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 5px; }
+  .tool-section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; font-weight: 500; }
+  .info-note { background: rgba(124,110,245,0.07); border: 1px solid rgba(124,110,245,0.2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .info-note strong { color: var(--accent2); font-weight: 500; }
+  code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 11px; font-family: monospace; }
+  @media (max-width: 600px) {
+    .tool-grid { grid-template-columns: repeat(2, 1fr); }
+    header { padding: 12px 14px; flex-wrap: wrap; }
+    .api-key-wrap input { width: 140px; }
+    .key-hint { display: none; }
+    main { padding: 20px 14px 60px; }
+    .ar-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="logo-dot"></span>PromptForge</div>
+  <div class="api-key-wrap">
+    <span class="key-hint">Clave en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></span>
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+    <span class="key-status" id="keyStatus"></span>
+  </div>
+</header>
+
+<main>
+
+  <div class="tab-group">
+    <button class="tab-btn active" id="tabImg" onclick="switchTab('image')">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="6" r="1.2" fill="currentColor"/><path d="M1.5 10.5L5 7.5L7.5 10L10 8L14.5 12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Imagen
+    </button>
+    <button class="tab-btn" id="tabVid" onclick="switchTab('video')">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M11.5 6L14.5 4.5V11.5L11.5 10V6Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+      Video
+    </button>
+  </div>
+
+  <!-- IMAGE PANEL -->
+  <div id="imagePanel">
+    <p class="tool-section-label">Selecciona la herramienta</p>
+    <div class="tool-grid">
+      <div class="tool-card selected" onclick="selectTool('nanobanana')" id="tool-nanobanana">
+        <span class="tool-logo">🍌</span>
+        <div class="tool-name">NanoBanana</div>
+        <div class="tool-desc">Pesos :: y separadores</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('midjourney')" id="tool-midjourney">
+        <span class="tool-logo">✦</span>
+        <div class="tool-name">Midjourney</div>
+        <div class="tool-desc">--ar --style --v 6</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('flux')" id="tool-flux">
+        <span class="tool-logo">⚡</span>
+        <div class="tool-name">Flux</div>
+        <div class="tool-desc">Descriptivo natural</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('dalle')" id="tool-dalle">
+        <span class="tool-logo">◎</span>
+        <div class="tool-name">DALL-E 3</div>
+        <div class="tool-desc">Oracional, natural</div>
+      </div>
+    </div>
+    <div class="section">
+      <label class="field-label" for="imgDesc">Descripción</label>
+      <textarea id="imgDesc" placeholder="Describe lo que quieres generar... Ej: un astronauta en una cafetería de los años 60, estética retro, colores cálidos" oninput="updateCharCount('imgDesc','imgChars')"></textarea>
+      <div class="char-count"><span id="imgChars">0</span> caracteres</div>
+    </div>
+    <div class="section">
+      <div class="collapsible-header" id="imgOptHeader" onclick="toggleCollapsible('imgOptBody','imgOptHeader')">
+        <span>Opcionales: estilo, mood, iluminación, aspecto</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="collapsible-body" id="imgOptBody">
+        <div class="pill-field">
+          <label class="field-label">Estilo artístico</label>
+          <div class="pills-wrap">
+            <div class="pill" onclick="togglePill(this,'style','3D Pixar / Disney animation style')">3D Pixar / Disney</div>
+            <div class="pill" onclick="togglePill(this,'style','photorealistic photography')">Foto realista</div>
+            <div class="pill" onclick="togglePill(this,'style','anime and manga illustration')">Anime / Manga</div>
+            <div class="pill" onclick="togglePill(this,'style','watercolor painting')">Acuarela</div>
+            <div class="pill" onclick="togglePill(this,'style','oil painting, classical art')">Pintura al óleo</div>
+            <div class="pill" onclick="togglePill(this,'style','cyberpunk neon aesthetic')">Cyberpunk</div>
+            <div class="pill" onclick="togglePill(this,'style','minimalist flat design')">Minimalista</div>
+            <div class="pill" onclick="togglePill(this,'style','pixel art retro game style')">Pixel Art</div>
+            <div class="pill" onclick="togglePill(this,'style','fantasy digital illustration')">Fantasy / Ilustración</div>
+            <div class="pill" onclick="togglePill(this,'style','retro vintage aesthetic, film grain')">Retro / Vintage</div>
+          </div>
+        </div>
+        <div class="pill-field">
+          <label class="field-label">Mood / Atmósfera</label>
+          <div class="pills-wrap">
+            <div class="pill" onclick="togglePill(this,'mood','epic and dramatic')">Épico y dramático</div>
+            <div class="pill" onclick="togglePill(this,'mood','serene and peaceful')">Sereno y tranquilo</div>
+            <div class="pill" onclick="togglePill(this,'mood','mysterious and dark')">Misterioso y oscuro</div>
+            <div class="pill" onclick="togglePill(this,'mood','cheerful and colorful')">Alegre y colorido</div>
+            <div class="pill" onclick="togglePill(this,'mood','melancholic and nostalgic')">Melancólico / Nostálgico</div>
+            <div class="pill" onclick="togglePill(this,'mood','romantic and soft')">Romántico y suave</div>
+            <div class="pill" onclick="togglePill(this,'mood','tense and ominous')">Tenso y ominoso</div>
+            <div class="pill" onclick="togglePill(this,'mood','dreamy and surreal')">Onírico y surreal</div>
+            <div class="pill" onclick="togglePill(this,'mood','adventurous and energetic')">Aventurero y energético</div>
+            <div class="pill" onclick="togglePill(this,'mood','clean and minimal')">Minimalista y limpio</div>
+          </div>
+        </div>
+        <div class="pill-field">
+          <label class="field-label">Iluminación / Cámara</label>
+          <div class="pills-wrap">
+            <div class="pill" onclick="togglePill(this,'light','golden hour warm sunset lighting')">Golden hour</div>
+            <div class="pill" onclick="togglePill(this,'light','soft studio lighting')">Estudio suave</div>
+            <div class="pill" onclick="togglePill(this,'light','neon lights, vibrant colors')">Luz neón</div>
+            <div class="pill" onclick="togglePill(this,'light','dramatic backlight silhouette')">Contraluz dramático</div>
+            <div class="pill" onclick="togglePill(this,'light','anamorphic cinematic lens flare')">Lente cinematográfico</div>
+            <div class="pill" onclick="togglePill(this,'light','moonlight, night scene')">Luz de luna</div>
+            <div class="pill" onclick="togglePill(this,'light','bokeh background blur, shallow depth of field')">Bokeh</div>
+            <div class="pill" onclick="togglePill(this,'light','chiaroscuro, strong shadows and contrast')">Claroscuro</div>
+            <div class="pill" onclick="togglePill(this,'light','volumetric light rays, god rays')">Luz volumétrica</div>
+            <div class="pill" onclick="togglePill(this,'light','aerial drone shot, bird eye view')">Toma aérea / drone</div>
+          </div>
+        </div>
+        <div class="pill-field">
+          <label class="field-label">Aspect Ratio</label>
+          <div class="ar-grid">
+            <div class="ar-card selected" onclick="selectAR(this,'','img')"><svg class="ar-visual" width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">Libre</span><span class="ar-name">Claude elige</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'1:1','img')"><svg class="ar-visual" width="20" height="20" viewBox="0 0 20 20"><rect x="1" y="1" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">1:1</span><span class="ar-name">Instagram feed</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'16:9','img')"><svg class="ar-visual" width="30" height="18" viewBox="0 0 30 18"><rect x="1" y="1" width="28" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">16:9</span><span class="ar-name">YouTube / TV</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'9:16','img')"><svg class="ar-visual" width="18" height="30" viewBox="0 0 18 30"><rect x="1" y="1" width="16" height="28" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">9:16</span><span class="ar-name">TikTok / Reels</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'4:3','img')"><svg class="ar-visual" width="28" height="22" viewBox="0 0 28 22"><rect x="1" y="1" width="26" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">4:3</span><span class="ar-name">Presentación</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'4:5','img')"><svg class="ar-visual" width="20" height="26" viewBox="0 0 20 26"><rect x="1" y="1" width="18" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">4:5</span><span class="ar-name">Instagram vertical</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'3:2','img')"><svg class="ar-visual" width="28" height="20" viewBox="0 0 28 20"><rect x="1" y="1" width="26" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">3:2</span><span class="ar-name">Foto DSLR</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'21:9','img')"><svg class="ar-visual" width="36" height="16" viewBox="0 0 36 16"><rect x="1" y="1" width="34" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">21:9</span><span class="ar-name">Cine ultrawide</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO PANEL -->
+  <div id="videoPanel" style="display:none">
+    <div style="margin-bottom:20px;">
+      <p class="tool-section-label" style="margin-bottom:10px;">Tipo de generación</p>
+      <div class="video-mode-toggle">
+        <button class="mode-btn active" id="modeTxt" onclick="switchVideoMode('text')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="5" x2="11" y2="5" stroke="currentColor" stroke-width="1"/><line x1="3" y1="7.5" x2="8" y2="7.5" stroke="currentColor" stroke-width="1"/></svg>
+          Texto a Video
+        </button>
+        <button class="mode-btn" id="modeImg" onclick="switchVideoMode('image')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="4.5" cy="4.5" r="1" fill="currentColor"/><path d="M1 9.5L4 7L6.5 9.5L9 7.5L13 11" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          Imagen a Video
+          <span class="mode-badge">ref</span>
+        </button>
+      </div>
+      <div id="imgModeNote" style="display:none;">
+        <div class="info-note">
+          <strong>Imagen a video:</strong> el prompt incluirá <code>Image reference: Provided</code> con descripción del estilo. Tú subirás la imagen directamente en la herramienta (Veo 3, Kling, etc.).
+        </div>
+      </div>
+    </div>
+
+    <p class="tool-section-label">Selecciona la herramienta</p>
+    <div class="tool-grid">
+      <div class="tool-card selected" onclick="selectTool('veo3')" id="tool-veo3">
+        <span class="tool-logo">◈</span>
+        <div class="tool-name">Veo 3</div>
+        <div class="tool-desc">Google, cinematográfico</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('runway')" id="tool-runway">
+        <span class="tool-logo">▷</span>
+        <div class="tool-name">Runway Gen-3</div>
+        <div class="tool-desc">[Camera] + escena</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('kling')" id="tool-kling">
+        <span class="tool-logo">◐</span>
+        <div class="tool-name">Kling</div>
+        <div class="tool-desc">Movimiento y física</div>
+      </div>
+      <div class="tool-card" onclick="selectTool('sora')" id="tool-sora">
+        <span class="tool-logo">◌</span>
+        <div class="tool-name">Sora</div>
+        <div class="tool-desc">Narrativa cinematográfica</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <label class="field-label" for="vidDesc">Describe tu idea de video</label>
+      <textarea id="vidDesc" style="min-height:140px;" placeholder='Describe todo libremente: personaje, escena, qué dice (incluye el diálogo entre comillas), movimientos de cámara, estilo visual, ambiente...
+
+Ej: Mujer 3D estilo Pixar, 28 años, en una oficina moderna. Mira a cámara y dice: "¡Hola! Te explico cómo usar Pacto en menos de un minuto". Al final la cámara hace zoom hacia el laptop. Iluminación suave, ambiente profesional.' oninput="updateCharCount('vidDesc','vidChars')"></textarea>
+      <div class="char-count"><span id="vidChars">0</span> caracteres</div>
+    </div>
+
+    <div class="section">
+      <div class="collapsible-header" id="vidOptHeader" onclick="toggleCollapsible('vidOptBody','vidOptHeader')">
+        <span>Opcionales: estilo, mood, aspect ratio</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="collapsible-body" id="vidOptBody">
+        <div class="pill-field">
+          <label class="field-label">Estilo visual</label>
+          <div class="pills-wrap">
+            <div class="pill" onclick="togglePill(this,'vstyle','3D Pixar / Disney animation style')">3D Pixar / Disney</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','photorealistic, live action')">Foto realista</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','anime animation style')">Anime</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','cyberpunk neon aesthetic')">Cyberpunk</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','cinematic film look, 35mm')">Cinematográfico / Film</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','stylized 3D render, soft lighting')">3D estilizado</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','retro vintage, film grain, VHS aesthetic')">Retro / VHS</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','documentary style, handheld camera')">Documental</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','fantasy epic, magical realism')">Fantasy épico</div>
+            <div class="pill" onclick="togglePill(this,'vstyle','minimalist clean commercial style')">Comercial limpio</div>
+          </div>
+        </div>
+        <div class="pill-field">
+          <label class="field-label">Mood / Atmósfera</label>
+          <div class="pills-wrap">
+            <div class="pill" onclick="togglePill(this,'vmood','epic and dramatic')">Épico y dramático</div>
+            <div class="pill" onclick="togglePill(this,'vmood','friendly and approachable')">Amigable y cercano</div>
+            <div class="pill" onclick="togglePill(this,'vmood','mysterious and dark')">Misterioso y oscuro</div>
+            <div class="pill" onclick="togglePill(this,'vmood','cheerful and energetic')">Alegre y energético</div>
+            <div class="pill" onclick="togglePill(this,'vmood','professional and corporate')">Profesional / Corporativo</div>
+            <div class="pill" onclick="togglePill(this,'vmood','romantic and emotional')">Romántico y emotivo</div>
+            <div class="pill" onclick="togglePill(this,'vmood','tense thriller atmosphere')">Tenso / Thriller</div>
+            <div class="pill" onclick="togglePill(this,'vmood','dreamy surreal')">Onírico y surreal</div>
+            <div class="pill" onclick="togglePill(this,'vmood','action packed fast paced')">Acción / Rápido</div>
+            <div class="pill" onclick="togglePill(this,'vmood','calm meditative peaceful')">Sereno y meditativo</div>
+          </div>
+        </div>
+        <div class="pill-field">
+          <label class="field-label">Aspect Ratio</label>
+          <div class="ar-grid">
+            <div class="ar-card selected" onclick="selectAR(this,'9:16','vid')"><svg class="ar-visual" width="16" height="28" viewBox="0 0 16 28"><rect x="1" y="1" width="14" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">9:16</span><span class="ar-name">TikTok / Reels ★</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'16:9','vid')"><svg class="ar-visual" width="30" height="18" viewBox="0 0 30 18"><rect x="1" y="1" width="28" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">16:9</span><span class="ar-name">YouTube / TV</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'1:1','vid')"><svg class="ar-visual" width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">1:1</span><span class="ar-name">Instagram feed</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'4:5','vid')"><svg class="ar-visual" width="20" height="26" viewBox="0 0 20 26"><rect x="1" y="1" width="18" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">4:5</span><span class="ar-name">Instagram vertical</span></div></div>
+            <div class="ar-card" onclick="selectAR(this,'21:9','vid')"><svg class="ar-visual" width="36" height="16" viewBox="0 0 36 16"><rect x="1" y="1" width="34" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><div class="ar-text"><span class="ar-ratio">21:9</span><span class="ar-name">Cine ultrawide</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-generate" id="btnGenerate" onclick="generatePrompt()">
+    <span class="spinner" id="spinner"></span>
+    <span id="btnText">Generar Prompt</span>
+  </button>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="output-section" id="outputSection">
+    <div class="output-header">
+      <span class="output-label">Prompt generado</span>
+      <span class="tool-badge" id="outputBadge"></span>
+    </div>
+    <div class="output-box" id="outputBox"></div>
+    <button class="btn-copy" id="btnCopy" onclick="copyPrompt()">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4.5" y="4.5" width="7.5" height="8" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M4.5 8.5H1.5C1.5 8.5 1 8.5 1 8V1.5C1 1.22 1.22 1 1.5 1H8C8.28 1 8.5 1.22 8.5 1.5V4.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+      Copiar
+    </button>
+  </div>
+
+</main>
+
+<script>
+// ─── IMAGE PROMPTS ────────────────────────────────────────────────────────────
+const IMAGE_PROMPTS = {
+  nanobanana: `Expert NanoBanana AI image prompt engineer. Return ONLY the optimized prompt, no explanations, no preamble.
+Syntax: weights with :: (e.g. portrait::2, landscape::1), comma separators, compact English terms.
+Structure: [subject::weight], [environment], [art style], [lighting], [technique], [quality]. Max 150 words.`,
+  midjourney: `Expert Midjourney v6 prompt engineer. Return ONLY the optimized prompt, no explanations, no preamble.
+Detailed description first, parameters at the end: --ar X:Y, --style raw, --v 6, --q 2. Always English, params LAST.`,
+  flux: `Expert Flux (Black Forest Labs) prompt engineer. Return ONLY the optimized prompt, no explanations, no preamble.
+Natural descriptive English prose, no special parameters, no :: weights. Fluid detailed paragraph. Max 200 words.`,
+  dalle: `Expert DALL-E 3 prompt engineer. Return ONLY the optimized prompt, no explanations, no preamble.
+Instructional English. Start with: "Create an image of..." Max 180 words.`
+};
+
+// ─── VIDEO SYSTEM PROMPT (few-shot, no prefill needed) ────────────────────────
+const VIDEO_SYSTEM = `You are an expert AI video prompt engineer. Convert the user's video idea into a structured, production-ready 8-second video prompt.
+
+YOUR RESPONSE MUST START IMMEDIATELY WITH "Model:" — no introduction, no preamble, no "Here is your prompt", nothing before "Model:".
+
+ABSOLUTE RULES:
+1. First word of your response must be "Model:" — violating this invalidates the output.
+2. Reproduce ALL dialogue EXACTLY as the user wrote it — same language, same words, zero changes.
+3. All timing must sum to exactly 8.0 seconds.
+4. IMAGE-TO-VIDEO mode → include "Image reference: Provided (...)" line. TEXT-TO-VIDEO → omit it entirely.
+5. Use ONLY named camera techniques — never vague descriptions.
+6. Every section header below is mandatory. Do not skip, rename, or reorder them.
+
+REQUIRED FORMAT (copy headers exactly):
+
+Model: [MODEL NAME]
+Length: 8s | FPS: 24 | Format: [ASPECT RATIO]
+[IMAGE-TO-VIDEO ONLY: Image reference: Provided ([visual style from user's idea]).]
+
+Timing & Lip-Sync:
+* Seconds 0.0 – 0.5: [Opening — character establishes presence, silent]
+* Seconds 0.5 – [X.X]: Character speaks: "[EXACT DIALOGUE AS USER WROTE IT]"
+* Seconds [X.X] – 8.0: [Closing action — reaction, transition, or reveal]
+
+Micro-actions:
+[2-3 physical micro-movements with second timestamps: blink, head tilt, breath, gaze shift, smile, hand gesture]
+
+Camera Direction:
+* Seconds 0.0 – [X.X]: [Named shot type] — [static or named movement]
+* Seconds [X.X] – 8.0: [Named transition: Dolly-In / Slow Zoom / Pan / Orbit / Cut to Close-up] — [what it reveals]
+
+Action:
+[Character's physical performance: energy, body language, posture, key gesture tied to a specific word or second]
+
+Style:
+[Visual render style, lighting quality, color palette, frame rate note]
+
+Audio:
+[Voice: gender, approximate age, accent, tone, energy level]
+Background sounds: [ambient + any specific sound effect with exact second timestamp]
+
+---
+EXAMPLE — study this input/output pair and replicate the structure and detail level for every request:
+
+INPUT:
+"3D Pixar-style woman in a modern office. She looks at the camera and says: '¡Hola! Ven, te explico cómo usar Pacto en menos de un minuto... y aseguras que nunca más te roben comprando por redes sociales. Mira...'. Then the camera zooms into the laptop in front of her. Mode: IMAGE-TO-VIDEO. Model: Veo-3. Format: 9:16."
+
+OUTPUT:
+Model: Veo-3
+Length: 8s | FPS: 24 | Format: 9:16
+Image reference: Provided (3D Pixar-style woman in modern office).
+
+Timing & Lip-Sync:
+* Seconds 0.0 – 0.5: The character smiles at the camera, silent (No dialogue).
+* Seconds 0.5 – 6.0: Character speaks: "¡Hola! Ven, te explico cómo usar Pacto en menos de un minuto... y aseguras que nunca más te roben comprando por redes sociales. Mira..."
+* Seconds 6.0 – 8.0: Character finishes speaking, leans slightly forward. Camera transitions to laptop screen close-up.
+
+Micro-actions:
+Natural blinking throughout. Friendly head tilt at second 1.2. At second 5.8, gaze shifts precisely from the lens to the laptop screen.
+
+Camera Direction:
+* Seconds 0.0 – 4.0: Static Medium Shot — establishes character in office environment.
+* Seconds 4.0 – 8.0: Smooth continuous Dolly-In — camera moves forward linearly following character's gaze, ending in Close-up of the laptop screen.
+
+Action:
+High-quality character animation. At the word "Mira", character leans slightly forward toward the laptop creating a magnetic pull toward the screen. Body language is warm, confident, and conversational throughout.
+
+Style:
+Stylized 3D (Pixar-style), cinematic soft lighting, warm office color palette, 24fps smooth animation.
+
+Audio:
+Clear female voice, 28 years old, charismatic Colombian accent, friendly and confident tone.
+Background sounds: Clean office ambiance throughout. Subtle digital notification sound effect at second 7.0 when camera focuses on the laptop screen.
+---
+
+Now generate the prompt for the user's request below. Remember: start your response with "Model:" immediately.`;
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const TOOL_NAMES = {
+  nanobanana: 'NanoBanana', midjourney: 'Midjourney', flux: 'Flux', dalle: 'DALL-E 3',
+  veo3: 'Veo 3', runway: 'Runway Gen-3', kling: 'Kling', sora: 'Sora'
+};
+const VIDEO_MODEL_NAMES = {
+  veo3: 'Veo-3', runway: 'Runway Gen-3 Alpha', kling: 'Kling AI', sora: 'Sora (OpenAI)'
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let currentTab = 'image';
+let selectedTool = 'nanobanana';
+let videoMode = 'text';
+let selections = { style: null, mood: null, light: null, ar: '', vstyle: null, vmood: null, vidAR: '9:16' };
+
+// ─── UI FUNCTIONS ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabImg').classList.toggle('active', tab === 'image');
+  document.getElementById('tabVid').classList.toggle('active', tab === 'video');
+  document.getElementById('imagePanel').style.display = tab === 'image' ? 'block' : 'none';
+  document.getElementById('videoPanel').style.display = tab === 'video' ? 'block' : 'none';
+  selectTool(tab === 'image' ? 'nanobanana' : 'veo3');
+  document.getElementById('outputSection').style.display = 'none';
+  hideError();
+}
+
+function switchVideoMode(mode) {
+  videoMode = mode;
+  document.getElementById('modeTxt').classList.toggle('active', mode === 'text');
+  document.getElementById('modeImg').classList.toggle('active', mode === 'image');
+  document.getElementById('imgModeNote').style.display = mode === 'image' ? 'block' : 'none';
+}
+
+function selectTool(tool) {
+  const prev = document.getElementById('tool-' + selectedTool);
+  if (prev) prev.classList.remove('selected');
+  selectedTool = tool;
+  const curr = document.getElementById('tool-' + tool);
+  if (curr) curr.classList.add('selected');
+}
+
+function togglePill(el, group, value) {
+  const isSelected = el.classList.contains('selected');
+  el.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+  selections[group] = isSelected ? null : value;
+  if (!isSelected) el.classList.add('selected');
+}
+
+function selectAR(el, value, panel) {
+  el.closest('.ar-grid').querySelectorAll('.ar-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  if (panel === 'vid') selections.vidAR = value;
+  else selections.ar = value;
+}
+
+function toggleCollapsible(bodyId, headerId) {
+  document.getElementById(bodyId).classList.toggle('open');
+  document.getElementById(headerId).classList.toggle('open');
+}
+
+function updateCharCount(inputId, countId) {
+  document.getElementById(countId).textContent = document.getElementById(inputId).value.length;
+}
+
+document.getElementById('apiKey').addEventListener('input', function() {
+  document.getElementById('keyStatus').classList.toggle('ok', this.value.startsWith('sk-ant-') && this.value.length > 20);
+});
+
+// ─── GENERATE ─────────────────────────────────────────────────────────────────
+async function generatePrompt() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showError('Ingresa tu API key de Anthropic (sk-ant-...). La obtienes en console.anthropic.com'); return; }
+
+  let systemPrompt, userMsg;
+
+  if (currentTab === 'image') {
+    const desc = document.getElementById('imgDesc').value.trim();
+    if (!desc) { showError('Escribe una descripción de lo que quieres generar.'); return; }
+    systemPrompt = IMAGE_PROMPTS[selectedTool];
+    userMsg = `Description: ${desc}`;
+    if (selections.style) userMsg += `\nArt style: ${selections.style}`;
+    if (selections.mood)  userMsg += `\nMood: ${selections.mood}`;
+    if (selections.light) userMsg += `\nLighting/Camera: ${selections.light}`;
+    if (selections.ar)    userMsg += `\nAspect ratio: ${selections.ar}`;
+  } else {
+    const desc = document.getElementById('vidDesc').value.trim();
+    if (!desc) { showError('Describe tu idea de video antes de generar.'); return; }
+    const modelName = VIDEO_MODEL_NAMES[selectedTool] || selectedTool;
+    systemPrompt = VIDEO_SYSTEM;
+    userMsg = `Video idea: ${desc}`;
+    userMsg += `\nTarget model: ${modelName}`;
+    userMsg += `\nAspect ratio: ${selections.vidAR}`;
+    userMsg += `\nMode: ${videoMode === 'image' ? 'IMAGE-TO-VIDEO' : 'TEXT-TO-VIDEO'}`;
+    if (selections.vstyle) userMsg += `\nVisual style: ${selections.vstyle}`;
+    if (selections.vmood)  userMsg += `\nMood: ${selections.vmood}`;
+  }
+
+  setLoading(true);
+  hideError();
+  document.getElementById('outputSection').style.display = 'none';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1200,
+        temperature: 0,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Error ${response.status}: verifica tu API key`);
+    }
+
+    const data = await response.json();
+    const result = data.content?.[0]?.text || '';
+
+    document.getElementById('outputBox').textContent = result;
+    document.getElementById('outputBadge').textContent = TOOL_NAMES[selectedTool];
+    document.getElementById('outputSection').style.display = 'block';
+    resetCopyBtn();
+    document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  } catch (e) {
+    showError('Error: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function setLoading(val) {
+  document.getElementById('btnGenerate').disabled = val;
+  document.getElementById('spinner').style.display = val ? 'block' : 'none';
+  document.getElementById('btnText').textContent = val ? 'Generando...' : 'Generar Prompt';
+}
+function showError(msg) { const el = document.getElementById('errorBox'); el.textContent = msg; el.style.display = 'block'; }
+function hideError() { document.getElementById('errorBox').style.display = 'none'; }
+function resetCopyBtn() {
+  const btn = document.getElementById('btnCopy');
+  btn.classList.remove('copied');
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4.5" y="4.5" width="7.5" height="8" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M4.5 8.5H1.5C1.5 8.5 1 8.5 1 8V1.5C1 1.22 1.22 1 1.5 1H8C8.28 1 8.5 1.22 8.5 1.5V4.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg> Copiar`;
+}
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('outputBox').textContent).then(() => {
+    const btn = document.getElementById('btnCopy');
+    btn.classList.add('copied');
+    btn.innerHTML = '✓ Copiado';
+    setTimeout(resetCopyBtn, 2000);
+  });
+}
+</script>
+</body>
+</html>
